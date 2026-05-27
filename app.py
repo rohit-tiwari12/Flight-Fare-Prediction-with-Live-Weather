@@ -3,70 +3,150 @@ from flask_cors import cross_origin
 import pickle
 import pandas as pd
 import numpy as np
+import requests
+import os
 
 app = Flask(__name__)
+
+# Load model
 model = pickle.load(open("flight_rf.pkl", "rb"))
 
+# OpenWeather API Key
+# For local testing, paste your API key below
+# For Render deployment, use environment variable
+API_KEY = os.getenv("OPENWEATHER_API_KEY", "OPENWEATHER_API_KEY")
 
-# ============================
+
+# ==========================================
+# WEATHER FUNCTION
+# ==========================================
+def get_weather(city):
+    try:
+        url = (
+            f"https://api.openweathermap.org/data/2.5/weather"
+            f"?q={city}&appid={API_KEY}&units=metric"
+        )
+
+        response = requests.get(url, timeout=5)
+
+        if response.status_code == 200:
+            data = response.json()
+
+            return {
+                "temperature": round(data["main"]["temp"], 1),
+                "humidity": data["main"]["humidity"],
+                "condition": data["weather"][0]["main"]
+            }
+
+    except Exception as e:
+        print("Weather API Error:", e)
+
+    return None
+
+
+# ==========================================
 # PREPROCESSING FUNCTION
-# ============================
-def preprocess_input(airline, source, destination, date, dep_time, arr_time, stops, duration):
+# ==========================================
+def preprocess_input(
+    airline,
+    source,
+    destination,
+    date,
+    dep_time,
+    arr_time,
+    stops,
+    duration
+):
 
-    # Convert date
-    journey_date = pd.to_datetime(date, dayfirst=True)
+    # Journey Date
+    journey_date = pd.to_datetime(date)
+
     journey_day = journey_date.day
     journey_month = journey_date.month
 
-    # Dep time
+    # Departure Time
     dep_dt = pd.to_datetime(dep_time)
+
     dep_hour = dep_dt.hour
     dep_min = dep_dt.minute
 
-    # Arrival time
+    # Arrival Time
     arr_dt = pd.to_datetime(arr_time)
+
     arrival_hour = arr_dt.hour
     arrival_min = arr_dt.minute
 
-    # Duration conversion
+    # Duration
     duration = duration.strip().lower()
+
     dur_hours = 0
     dur_mins = 0
 
     if "h" in duration:
         dur_hours = int(duration.split("h")[0])
+
     if "m" in duration:
         if "h" in duration:
-            dur_mins = int(duration.split("h")[1].strip().replace("m", ""))
+            mins_part = duration.split("h")[1].strip().replace("m", "")
+            dur_mins = int(mins_part) if mins_part else 0
         else:
             dur_mins = int(duration.replace("m", ""))
 
-    # Total stops
-    stops_map = {"0": 0, "1": 1, "2": 2, "3": 3, "4": 4}
-    total_stops = stops_map.get(stops, 0)
+    # Stops
+    total_stops = int(stops)
 
-    # Encoding airline, source, destination exactly like training
-    airline_list = ['Air Asia', 'Air India', 'GoAir', 'IndiGo', 'Jet Airways',
-                    'Jet Airways Business', 'Multiple carriers',
-                    'Multiple carriers Premium economy',
-                    'SpiceJet', 'Trujet', 'Vistara', 'Vistara Premium economy']
+    # Airline Encoding
+    airline_list = [
+        'Air Asia',
+        'Air India',
+        'GoAir',
+        'IndiGo',
+        'Jet Airways',
+        'Jet Airways Business',
+        'Multiple carriers',
+        'Multiple carriers Premium economy',
+        'SpiceJet',
+        'Trujet',
+        'Vistara',
+        'Vistara Premium economy'
+    ]
 
-    if airline not in airline_list:
-        airline_enc = 0
-    else:
-        airline_enc = airline_list.index(airline)
+    airline_enc = (
+        airline_list.index(airline)
+        if airline in airline_list
+        else 0
+    )
 
-    source_list = ['Banglore', 'Chennai', 'Delhi', 'Kolkata', 'Mumbai']
-    if source not in source_list:
-        source_enc = 0
-    else:
-        source_enc = source_list.index(source)
+    # Source Encoding
+    source_list = [
+        'Banglore',
+        'Chennai',
+        'Delhi',
+        'Kolkata',
+        'Mumbai'
+    ]
 
-    dest_list = ['Banglore', 'Cochin', 'Delhi', 'Hyderabad', 'Kolkata', 'New Delhi']
-    if destination not in dest_list:
-        destination_enc = 0
-    else:
-        destination_enc = dest_list.index(destination)
+    source_enc = (
+        source_list.index(source)
+        if source in source_list
+        else 0
+    )
+
+    # Destination Encoding
+    dest_list = [
+        'Banglore',
+        'Cochin',
+        'Delhi',
+        'Hyderabad',
+        'Kolkata',
+        'New Delhi'
+    ]
+
+    destination_enc = (
+        dest_list.index(destination)
+        if destination in dest_list
+        else 0
+    )
 
     final_features = np.array([[
         airline_enc,
@@ -86,19 +166,22 @@ def preprocess_input(airline, source, destination, date, dep_time, arr_time, sto
     return final_features
 
 
-# ============================
+# ==========================================
 # HOME ROUTE
-# ============================
+# ==========================================
 @app.route("/")
+@cross_origin()
 def home():
     return render_template("index.html")
 
 
-# ============================
+# ==========================================
 # PREDICT ROUTE
-# ============================
+# ==========================================
 @app.route("/predict", methods=["POST"])
+@cross_origin()
 def predict():
+
     airline = request.form["airline"]
     source = request.form["source"]
     destination = request.form["destination"]
@@ -109,16 +192,48 @@ def predict():
     duration = request.form["duration"]
 
     final_input = preprocess_input(
-        airline, source, destination, date, dep_time, arr_time, stops, duration
+        airline,
+        source,
+        destination,
+        date,
+        dep_time,
+        arr_time,
+        stops,
+        duration
     )
 
     prediction = model.predict(final_input)[0]
 
-    return render_template("index.html", prediction_text=f"Predicted Fare: ₹{int(prediction)}")
+    weather = get_weather(source)
+
+    weather_icons = {
+        "Clear": "☀️",
+        "Clouds": "☁️",
+        "Rain": "🌧️",
+        "Thunderstorm": "⛈️",
+        "Snow": "❄️",
+        "Mist": "🌫️",
+        "Haze": "🌫️"
+    }
+
+    weather_icon = "🌍"
+
+    if weather:
+        weather_icon = weather_icons.get(
+            weather["condition"],
+            "🌍"
+        )
+
+    return render_template(
+        "index.html",
+        prediction_text=f"Predicted Fare: ₹{int(prediction)}",
+        weather=weather,
+        weather_icon=weather_icon
+    )
 
 
-# ============================
+# ==========================================
 # MAIN
-# ============================
+# ==========================================
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    app.run(host="0.0.0.0", port=5000, debug=True)

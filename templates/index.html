@@ -21,13 +21,21 @@
             padding: 30px;
             border-radius: 15px;
             box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+            background: white;
         }
 
         h2 {
             text-align: center;
             font-weight: 700;
             color: #333;
-            margin-bottom: 20px;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 25px;
+            font-size: 15px;
         }
 
         label {
@@ -57,8 +65,30 @@
             color: white;
             font-size: 22px;
             text-align: center;
+            font-weight: bold;
         }
 
+        .weather-card {
+            margin-top: 20px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 18px;
+            text-align: center;
+            border-left: 5px solid #0072ff;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .weather-card h4 {
+            color: #0072ff;
+            margin-bottom: 15px;
+            font-weight: 700;
+        }
+
+        .weather-info p {
+            margin: 8px 0;
+            font-size: 17px;
+            color: #333;
+        }
     </style>
 </head>
 
@@ -68,7 +98,11 @@
     <div class="col-md-6 offset-md-3">
         <div class="card">
 
-            <h2>✈ Flight Fare Predictor</h2>
+            <h2>✈ Flight Fare Predictor with Live Weather</h2>
+
+            <p class="subtitle">
+                Predict flight fares using Machine Learning and view real-time weather at the departure city.
+            </p>
 
             <form action="/predict" method="post">
 
@@ -79,7 +113,11 @@
 
                 <div class="form-group">
                     <label>Duration (Example: 2h 45m)</label>
-                    <input type="text" name="duration" class="form-control" placeholder="e.g., 1h 30m" required>
+                    <input type="text"
+                           name="duration"
+                           class="form-control"
+                           placeholder="e.g., 2h 45m"
+                           required>
                 </div>
 
                 <div class="form-group">
@@ -140,13 +178,27 @@
                     </select>
                 </div>
 
-                <button type="submit" class="btn btn-primary">Predict Fare</button>
+                <button type="submit" class="btn btn-primary">
+                    Predict Fare
+                </button>
 
             </form>
 
             {% if prediction_text %}
             <div class="result">
                 {{ prediction_text }}
+            </div>
+            {% endif %}
+
+            {% if weather %}
+            <div class="weather-card">
+                <h4>{{ weather_icon }} Live Weather at Departure City</h4>
+
+                <div class="weather-info">
+                    <p><strong>🌡 Temperature:</strong> {{ weather.temperature }} °C</p>
+                    <p><strong>💧 Humidity:</strong> {{ weather.humidity }}%</p>
+                    <p><strong>☁ Condition:</strong> {{ weather.condition }}</p>
+                </div>
             </div>
             {% endif %}
 
