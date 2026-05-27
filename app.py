@@ -14,7 +14,7 @@ model = pickle.load(open("flight_rf.pkl", "rb"))
 # OpenWeather API Key
 # For local testing, paste your API key below
 # For Render deployment, use environment variable
-API_KEY = os.getenv("OPENWEATHER_API_KEY", "OPENWEATHER_API_KEY")
+API_KEY = os.getenv("84317563a4c0f5f8085cd57391237a89", "84317563a4c0f5f8085cd57391237a89")
 
 
 # ==========================================
